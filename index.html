@@ -1,0 +1,320 @@
+<html>
+    <head>
+        <title>
+
+        </title>
+        <base href="./">
+        <link rel="icon" href="favicon.ico" type="image/x-icon">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {
+                margin: 0rem;
+                padding: 0rem;
+            }
+
+            table {
+                border: 1px solid #000;
+            }
+
+            th {
+                border: 1px solid #000;
+                padding: 1rem;
+                font-weight: bold;
+            }
+
+            td {
+                border: 1px solid #000;
+                padding: 1rem;
+            }
+
+            .dark {
+                background-color: #000;
+                color: #fff;
+            }
+
+            .dark table {
+                border: 1px solid #fff;
+            }
+
+            .dark th {
+                border: 1px solid #fff;
+            }
+
+            .dark td {
+                border: 1px solid #fff;
+            }
+        </style>
+    </head>
+    <body class="dark">
+        <div style="
+            display: grid;
+            grid-template-rows: max-content 1fr;
+            height: 100%;">
+            <div style="
+                display: grid;
+                grid-template-columns: max-content 1fr repeat(3, max-content);">
+                <div style="
+                    padding: 1rem;">
+                    <input type="file" id="uploadExcel" accept=".xlsx">
+                </div>
+                <div></div>
+                <div style="
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 1rem;">
+                    <button style="
+                        display: none;"
+                        id="btnDownloadAsCSV">
+                        Export as CSV
+                    </button>
+                </div>
+                <div style="
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 1rem;">
+                    <button style="
+                        display: none;"
+                        id="btnDownloadAsXLSX">
+                        Export as XLSX
+                    </button>
+                </div>
+                <div style="
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    padding: 1rem"
+                    id="btnToggleTheme">
+                    <svg style="
+                        width: 2rem;
+                        height: 2rem;"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 -960 960 960"
+                        fill="currentColor"><path d="M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z"/></svg>
+                </div>
+            </div>
+            <div style="
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 1rem;
+                overflow-x: auto;">
+                <table style="
+                    display: none;"
+                    id="tblOutput">
+                    <tr>
+                        <th id="thName">
+                            Name
+                        </th>
+                        <th id="thHours">
+                            Total Hours
+                        </th>
+                        <th id="thGrossPay">
+                            Gross Pay (&#8369;)
+                        </th>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </body>
+    <script type="module">
+        import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs";
+
+        let uploadExcel = document.getElementById("uploadExcel");
+        let tblOutput = document.getElementById("tblOutput");
+        let btnDownloadAsCSV = document.getElementById("btnDownloadAsCSV");
+        let btnDownloadAsXLSX = document.getElementById("btnDownloadAsXLSX");
+      
+        uploadExcel.addEventListener("change", () => {
+            let file = event.target.files[0]; // Get uploaded file
+            if (!file) return;
+            let reader = new FileReader();
+            
+            reader.onload = function (e) {
+                let data = new Uint8Array(e.target.result); // Convert to binary array
+                let workbook = XLSX.read(data, { type: "array" }); // Read file
+                let sheetName = workbook.SheetNames['0']; // Get first sheet
+                let worksheet = workbook.Sheets['TimeLogs'];
+                let jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // Convert to JSON
+                let name = "";
+                let hours = 0;
+                let result = [];
+                let i = 0;
+
+                while (i < jsonData.length) {
+                    let row = jsonData[i];
+                    name = "";
+                    hours = 0;
+
+                    if (row[0] == "ID") {
+                        let j = 0;
+
+                        while (j < row.length) {
+                            if (row[j] == "Name") {
+                                name = row[j + 2];
+                                i += 3;
+                                row = jsonData[i];
+
+                                for (let cell of row) {
+                                    cell += "";
+
+                                    if (cell.length > 0) {
+                                        hours += calculateTotalHours(cell);
+                                    }
+                                }
+
+                                result.push({
+                                    name: name,
+                                    hours: hours,
+                                    grossPay: hours * 50
+                                });
+                                break;
+                            }
+
+                            j++;
+                        }
+                    }
+
+                    i++;
+                }
+
+                tblOutput.style.display = "";
+                btnDownloadAsCSV.style.display = "";
+                btnDownloadAsXLSX.style.display = "";
+
+                for (let output of result) {
+                    let item = document.createElement("tr");
+
+                    item.innerHTML = /*html*/`
+                        <td>
+                            ${output.name.toUpperCase()}
+                        </td>
+                        <td>
+                            ${(Math.round(output.hours * 100) / 100).toFixed(2)} hrs
+                        </td>
+                        <td>
+                            &dollar; ${formatNumber(Math.floor(output.grossPay), 2)}
+                        </td>
+                    `;
+
+                    document.querySelector("tbody").appendChild(item);
+                }
+            };
+        
+            reader.readAsArrayBuffer(file); // Read the file as an ArrayBuffer
+        });
+
+        function calculateTotalHours(timeString) {
+            const times = timeString.split("\n"); // Split input by newline
+            let totalHours = 0;
+
+            for (let i = 0; i < times.length; i += 2) {
+                if (i + 1 >= times.length) break; // Ensure there is a matching end time
+
+                const start = parseTime(times[i]);
+                const end = parseTime(times[i + 1]);
+
+                // totalHours += (end - start) / 60; // Convert minutes to hours
+                totalHours += timeDifferenceInHours(times[i], times[i + 1]);
+            }
+
+            return totalHours;
+        }
+
+        // Helper function to convert "HH:MM" to total minutes
+        function parseTime(timeStr) {
+            const [hours, minutes] = timeStr.split(":").map(Number);
+            return hours * 60 + minutes; // Convert to total minutes
+        }
+
+        function timeDifferenceInHours(start, end) {
+            const [sh, sm] = start.split(":").map(Number);
+            const [eh, em] = end.split(":").map(Number);
+            
+            const startMinutes = sh * 60 + sm;
+            const endMinutes = eh * 60 + em;
+
+            return excelRound((endMinutes - startMinutes) / 60, 10); // Ensures Excel-like precision
+        }
+
+        function excelRound(value, decimals) {
+            const factor = 10 ** decimals;
+            return Math.round((value + Number.EPSILON) * factor) / factor;
+        }
+
+        function formatNumber(num, decimals = 2) {
+            return num.toLocaleString("en-US", { 
+                minimumFractionDigits: decimals, 
+                maximumFractionDigits: decimals 
+            });
+        }
+      
+        btnDownloadAsXLSX.addEventListener("click", () => {
+            downloadTable("xlsx");
+        });
+      
+        btnDownloadAsCSV.addEventListener("click", () => {
+            downloadTable("csv");
+        });
+      
+        function downloadTable(format) {
+            const table = document.getElementById("tblOutput"); // Get table element
+            const worksheet = XLSX.utils.table_to_sheet(table); // Convert table to worksheet
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1"); // Add sheet
+        
+            if (format === "csv") {
+                XLSX.writeFile(workbook, "table_data.csv", { bookType: "csv" });
+            } else {
+                XLSX.writeFile(workbook, "table_data.xlsx", { bookType: "xlsx" });
+            }
+        }
+
+        let btnToggleTheme = document.getElementById("btnToggleTheme");
+        document.body.classList.toggle("dark");
+
+        btnToggleTheme.addEventListener("click", () => {
+            document.body.classList.toggle("dark");
+        });
+
+        let thName = document.getElementById("thName");
+        let thHours = document.getElementById("thHours");
+        let thGrossPay = document.getElementById("thGrossPay");
+
+        thName.addEventListener("click", () => {
+            sortTable(0);
+        });
+
+        thHours.addEventListener("click", () => {
+            sortTable(1);
+        });
+
+        thGrossPay.addEventListener("click", () => {
+            sortTable(2);
+        });
+
+        function sortTable(columnIndex) {
+            const table = tblOutput;
+            const rows = Array.from(table.rows).slice(1); // Get rows excluding the header
+            const isNumericColumn = !isNaN(rows[0].cells[columnIndex].textContent.trim());
+
+            // Sort rows based on the column clicked
+            rows.sort((rowA, rowB) => {
+            const cellA = rowA.cells[columnIndex].textContent.trim();
+            const cellB = rowB.cells[columnIndex].textContent.trim();
+
+            // For numeric columns, compare numbers
+            if (isNumericColumn) {
+                return parseFloat(cellA) - parseFloat(cellB);
+            }
+
+            // For text columns, compare strings (case insensitive)
+            return cellA.localeCompare(cellB, undefined, { sensitivity: "base" });
+            });
+
+            // Reorder the rows in the table
+            rows.forEach(row => table.appendChild(row)); // Append each row back in the sorted order
+        }
+    </script>
+</html>
